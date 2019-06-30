@@ -19,44 +19,7 @@ func main() {
 
 	w := watcher.New()
 	w.FilterOps(watcher.Rename, watcher.Remove, watcher.Create, watcher.Write)
-
-	go func() {
-		for {
-			select {
-			case event := <-w.Event:
-
-				otherEvent := false
-				if event.Op == watcher.Remove {
-					otherEvent = true
-					deleteFileFromS3(event.FileInfo.Name())
-				}
-
-				if event.Op == watcher.Create {
-					otherEvent = true
-					uploadFile(event.FileInfo.Name())
-				}
-
-				if event.Op == watcher.Rename {
-					otherEvent = true
-					deleteFileFromS3(event.FileInfo.Name())
-					paths := strings.Split(event.Path, "->")
-					splitPath := strings.Split(paths[1], "/")
-					newFileName := splitPath[len(splitPath) -1]
-					uploadFile(newFileName)
-				}
-
-				if event.Op == watcher.Write && !otherEvent && !event.IsDir(){
-					uploadFile(event.FileInfo.Name())
-				}
-
-				log.Println(event) // Print the event's info.
-			case err := <-w.Error:
-				log.Fatalln(err)
-			case <-w.Closed:
-				return
-			}
-		}
-	}()
+	go handleFileEvents(w)
 
 	if err := w.Add("test"); err != nil {
 		log.Fatalln(err)
@@ -230,12 +193,50 @@ func deleteFileFromS3(fileName string) {
 
 	deleteInput := &s3.DeleteObjectInput{
 		Bucket: aws.String("my-go-box"),
-		Key: aws.String(fileName),
+		Key:    aws.String(fileName),
 	}
 
 	s3Service := s3.New(sess)
 	_, s3Error := s3Service.DeleteObject(deleteInput)
 	if s3Error != nil {
 		log.Fatalln(s3Error)
+	}
+}
+
+func handleFileEvents(w *watcher.Watcher) {
+	for {
+		select {
+		case event := <-w.Event:
+
+			otherEvent := false
+			if event.Op == watcher.Remove {
+				otherEvent = true
+				deleteFileFromS3(event.FileInfo.Name())
+			}
+
+			if event.Op == watcher.Create {
+				otherEvent = true
+				uploadFile(event.FileInfo.Name())
+			}
+
+			if event.Op == watcher.Rename {
+				otherEvent = true
+				deleteFileFromS3(event.FileInfo.Name())
+				paths := strings.Split(event.Path, "->")
+				splitPath := strings.Split(paths[1], "/")
+				newFileName := splitPath[len(splitPath)-1]
+				uploadFile(newFileName)
+			}
+
+			if event.Op == watcher.Write && !otherEvent && !event.IsDir() {
+				uploadFile(event.FileInfo.Name())
+			}
+
+		case err := <-w.Error:
+			log.Fatalln(err)
+
+		case <-w.Closed:
+			return
+		}
 	}
 }
