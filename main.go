@@ -17,7 +17,7 @@ func main() {
 	syncEnvironments()
 
 	w := watcher.New()
-	w.FilterOps(watcher.Rename, watcher.Remove)
+	w.FilterOps(watcher.Rename, watcher.Remove, watcher.Create)
 
 	go func() {
 		for {
@@ -31,6 +31,10 @@ func main() {
 
 				if event.Op == watcher.Remove {
 					deleteFileFromS3(event.FileInfo.Name())
+				}
+
+				if event.Op == watcher.Create {
+					uploadFile(event.FileInfo.Name())
 				}
 
 				log.Println(event) // Print the event's info.
@@ -176,8 +180,8 @@ func uploadMissingFiles(missingFromS3 []string) {
 	}
 }
 
-func uploadFile(missingFileName string) {
-	f, fErr := os.Open("./test/" + missingFileName)
+func uploadFile(fileName string) {
+	f, fErr := os.Open("./test/" + fileName)
 	if fErr != nil {
 		log.Fatalln(fErr)
 	}
@@ -192,7 +196,7 @@ func uploadFile(missingFileName string) {
 	}
 	putInput := &s3.PutObjectInput{
 		Bucket: aws.String("my-go-box"),
-		Key:    aws.String(missingFileName),
+		Key:    aws.String(fileName),
 		Body:   bytes.NewReader(buffer),
 	}
 	s3Service := s3.New(sess)
