@@ -179,6 +179,8 @@ func uploadFile(fileName string) {
 	if s3Error != nil {
 		log.Fatalln(s3Error)
 	}
+
+	f.Close()
 }
 
 func deleteFileFromS3(fileName string) {
