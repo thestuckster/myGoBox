@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,23 +18,34 @@ func main() {
 	syncEnvironments()
 
 	w := watcher.New()
-	w.FilterOps(watcher.Rename, watcher.Remove, watcher.Create)
+	w.FilterOps(watcher.Rename, watcher.Remove, watcher.Create, watcher.Write)
 
 	go func() {
 		for {
 			select {
 			case event := <-w.Event:
 
-				//TODO: event handling. other than just syncing data
-				if event.Op == watcher.Write {
-					syncEnvironments()
-				}
-
+				otherEvent := false
 				if event.Op == watcher.Remove {
+					otherEvent = true
 					deleteFileFromS3(event.FileInfo.Name())
 				}
 
 				if event.Op == watcher.Create {
+					otherEvent = true
+					uploadFile(event.FileInfo.Name())
+				}
+
+				if event.Op == watcher.Rename {
+					otherEvent = true
+					deleteFileFromS3(event.FileInfo.Name())
+					paths := strings.Split(event.Path, "->")
+					splitPath := strings.Split(paths[1], "/")
+					newFileName := splitPath[len(splitPath) -1]
+					uploadFile(newFileName)
+				}
+
+				if event.Op == watcher.Write && !otherEvent && !event.IsDir(){
 					uploadFile(event.FileInfo.Name())
 				}
 
