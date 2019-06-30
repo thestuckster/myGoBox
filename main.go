@@ -66,8 +66,10 @@ func syncEnvironments() {
 	}
 	missingFromSystem := findFilesMissingFromSystem(s3FileNames, systemFileNames)
 	missingFromS3 := findFilesMissingFromS3(s3FileNames, systemFileNames)
+
 	log.Print(strconv.Itoa(len(missingFromSystem)) + " missing from your system")
 	log.Print(strconv.Itoa(len(missingFromS3)) + " missing from your cloud")
+
 	downloadMissingFiles(missingFromSystem)
 	uploadMissingFiles(missingFromS3)
 }
